@@ -1,0 +1,3185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Poker Manager — Deep Stack + Bounty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* === Default theme: Casino (felt green + gold) === */
+    --felt-deep: #0a1f17;
+    --felt: #0f2d22;
+    --felt-light: #14392c;
+    --gold: #c9a449;
+    --gold-bright: #e6c876;
+    --gold-dim: #8a7235;
+    --cream: #f4ecd8;
+    --red: #b8252c;
+    --red-bright: #e63946;
+    --ivory: #ede4cf;
+    --shadow: rgba(0,0,0,.55);
+    --bg-grad-top: #163a2c;
+    --bg-grad-mid: #0a1f17;
+    --bg-grad-bot: #050d09;
+    --accent-rgb: 201,164,73;
+  }
+
+  /* Theme: Onyx (pure black + silver/gold) */
+  body[data-theme="onyx"] {
+    --felt-deep: #0a0a0a;
+    --felt: #161616;
+    --felt-light: #1f1f1f;
+    --gold: #d4af37;
+    --gold-bright: #f4d97a;
+    --gold-dim: #7a6420;
+    --cream: #ececec;
+    --red: #8b1a1a;
+    --red-bright: #d63030;
+    --ivory: #f5f5f5;
+    --shadow: rgba(0,0,0,.7);
+    --bg-grad-top: #1c1c1c;
+    --bg-grad-mid: #0a0a0a;
+    --bg-grad-bot: #000000;
+    --accent-rgb: 212,175,55;
+  }
+
+  /* Theme: Crimson (deep red + warm gold) */
+  body[data-theme="crimson"] {
+    --felt-deep: #1a0608;
+    --felt: #2a0a0e;
+    --felt-light: #3d1117;
+    --gold: #e0b04a;
+    --gold-bright: #ffd97a;
+    --gold-dim: #8c6b1f;
+    --cream: #f8e8d0;
+    --red: #c91432;
+    --red-bright: #ff3852;
+    --ivory: #fff0e0;
+    --shadow: rgba(40,0,5,.7);
+    --bg-grad-top: #4d0a14;
+    --bg-grad-mid: #1f0408;
+    --bg-grad-bot: #0a0103;
+    --accent-rgb: 224,176,74;
+  }
+
+  /* Theme: Sapphire (deep blue + ice) */
+  body[data-theme="sapphire"] {
+    --felt-deep: #050e1c;
+    --felt: #0a172e;
+    --felt-light: #122242;
+    --gold: #6fb3ff;
+    --gold-bright: #a8d4ff;
+    --gold-dim: #3d6da6;
+    --cream: #e8f1ff;
+    --red: #c91432;
+    --red-bright: #ff3852;
+    --ivory: #f0f6ff;
+    --shadow: rgba(0,5,20,.7);
+    --bg-grad-top: #1a3b6e;
+    --bg-grad-mid: #08152c;
+    --bg-grad-bot: #02060f;
+    --accent-rgb: 111,179,255;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background:
+      radial-gradient(ellipse at top, var(--bg-grad-top) 0%, var(--bg-grad-mid) 60%, var(--bg-grad-bot) 100%);
+    color: var(--cream);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.5s ease;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      repeating-linear-gradient(45deg, transparent 0 2px, rgba(255,255,255,.012) 2px 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    min-height: 0; /* allow children to use overflow */
+    width: 100%;
+    padding: 20px 24px 24px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(380px, 28vw, 520px);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 20px 24px;
+  }
+
+  /* Header */
+  .header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(201,164,73,.3);
+    padding-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .brand {
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--gold);
+    text-shadow: 0 0 20px rgba(201,164,73,.4);
+    line-height: 1.1;
+  }
+  .brand small { color: var(--cream); font-weight: 500; font-size: 12px; letter-spacing: 3px; font-family: 'Inter', sans-serif; }
+  .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* Main area: timer card fills available height, no scroll */
+  main {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  main > .timer-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  /* Sidebar: scrolls independently */
+  .side {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+  }
+  .side::-webkit-scrollbar { width: 8px; }
+  .side::-webkit-scrollbar-track { background: rgba(0,0,0,.2); border-radius: 4px; }
+  .side::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 4px; }
+  .side::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+  /* Buttons */
+  button, .btn {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(180deg, #1a4332 0%, #0e2a20 100%);
+    color: var(--ivory);
+    border: 1px solid rgba(201,164,73,.4);
+    padding: 10px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all .15s ease;
+  }
+  button:hover { border-color: var(--gold-bright); background: linear-gradient(180deg, #205040 0%, #143628 100%); }
+  button:active { transform: translateY(1px); }
+  button.gold {
+    background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold-dim) 100%);
+    color: #1a1208;
+    border-color: var(--gold-bright);
+  }
+  button.gold:hover { background: linear-gradient(180deg, #f0d68a 0%, var(--gold) 100%); }
+  button.red {
+    background: linear-gradient(180deg, var(--red-bright) 0%, #7a181d 100%);
+    border-color: var(--red-bright);
+    color: #fff;
+  }
+  button.ghost { background: transparent; }
+  button.tiny { padding: 4px 8px; font-size: 11px; letter-spacing: .5px; }
+
+  /* Main timer card */
+  .timer-card {
+    background:
+      radial-gradient(ellipse at center, var(--felt-light) 0%, var(--felt) 60%, var(--felt-deep) 100%);
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    padding: clamp(20px, 2.5vh, 36px) clamp(20px, 3vw, 48px);
+    text-align: center;
+    box-shadow:
+      inset 0 0 80px rgba(0,0,0,.5),
+      0 10px 40px var(--shadow),
+      0 0 0 8px rgba(201,164,73,.08);
+    position: relative;
+  }
+  .timer-card::before {
+    content: '♠ ♥ ♦ ♣';
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    color: var(--gold-dim); font-size: 14px; letter-spacing: 12px;
+  }
+
+  .level-label {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(13px, 1.2vw, 18px);
+    letter-spacing: 6px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .level-num {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(50px, 7vw, 110px);
+    font-weight: 900;
+    color: var(--ivory);
+    line-height: 1;
+    margin: 8px 0 4px;
+    text-shadow: 0 4px 20px rgba(0,0,0,.6);
+  }
+  .level-num.break { color: var(--red-bright); }
+
+  .timer-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(100px, 16vw, 260px);
+    font-weight: 700;
+    line-height: 1;
+    margin: clamp(8px, 1.5vh, 20px) 0;
+    color: var(--ivory);
+    text-shadow:
+      0 0 40px rgba(201,164,73,.3),
+      0 6px 30px rgba(0,0,0,.7);
+    letter-spacing: -4px;
+    transition: color .2s;
+  }
+  .timer-display.warning { color: var(--gold-bright); animation: pulseGold 1s ease-in-out infinite; }
+  .timer-display.critical { color: var(--red-bright); animation: pulseRed .5s ease-in-out infinite; }
+  @keyframes pulseGold { 50% { text-shadow: 0 0 60px rgba(230,200,118,.7), 0 6px 30px rgba(0,0,0,.7); } }
+  @keyframes pulseRed { 50% { text-shadow: 0 0 60px rgba(230,57,70,.8), 0 6px 30px rgba(0,0,0,.7); } }
+
+  .blinds-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: clamp(16px, 2vw, 36px);
+    margin: 12px 0 4px;
+  }
+  .blind-block { text-align: center; }
+  .blind-block .label {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: clamp(11px, 0.95vw, 16px);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .blind-block .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(40px, 4.5vw, 80px);
+    font-weight: 700;
+    color: var(--ivory);
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .blind-sep {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(36px, 4vw, 80px);
+    color: var(--gold-dim);
+  }
+  .ante-row {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: clamp(12px, 1vw, 17px);
+    letter-spacing: 4px;
+    margin-bottom: 12px;
+  }
+  .ante-row .ante-val {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ivory);
+    font-size: clamp(18px, 1.5vw, 26px);
+    letter-spacing: 0;
+    margin-left: 8px;
+  }
+
+  .next-level {
+    margin-top: clamp(10px, 1.5vh, 20px);
+    padding: clamp(8px, 1vh, 14px);
+    background: rgba(0,0,0,.3);
+    border-radius: 6px;
+    border: 1px solid rgba(201,164,73,.15);
+    font-size: clamp(12px, 0.95vw, 15px);
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+  .next-level strong { color: var(--ivory); font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: clamp(12px, 1.8vh, 24px);
+    flex-wrap: wrap;
+  }
+  .controls button { min-width: 90px; }
+  .play-btn {
+    font-size: clamp(14px, 1.1vw, 18px) !important;
+    padding: clamp(10px, 1.2vh, 16px) clamp(20px, 2.5vw, 40px) !important;
+    min-width: 140px !important;
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: clamp(12px, 1.8vh, 24px);
+  }
+  .stat {
+    background: rgba(0,0,0,.35);
+    border: 1px solid rgba(201,164,73,.2);
+    border-radius: 6px;
+    padding: clamp(10px, 1.2vh, 16px);
+    text-align: center;
+  }
+  .stat .label {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: clamp(10px, 0.8vw, 13px);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .stat .value {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ivory);
+    font-size: clamp(20px, 1.8vw, 30px);
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .stat .sub { font-size: clamp(10px, 0.8vw, 12px); color: var(--gold-dim); margin-top: 2px; }
+
+  /* Side panel containers */
+  .panel {
+    background: linear-gradient(180deg, rgba(20,57,44,.6) 0%, rgba(10,31,23,.8) 100%);
+    border: 1px solid rgba(201,164,73,.3);
+    border-radius: 8px;
+    padding: 16px;
+    flex-shrink: 0;
+  }
+  .panel h2 {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(201,164,73,.2);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel h2 .count {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ivory);
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  /* Players */
+  .add-player {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  input, select {
+    background: rgba(0,0,0,.4);
+    border: 1px solid rgba(201,164,73,.3);
+    color: var(--ivory);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    width: 100%;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--gold); }
+  input::placeholder { color: rgba(237,228,207,.4); }
+
+  .player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .player {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(0,0,0,.25);
+    border-left: 3px solid var(--gold);
+    border-radius: 3px;
+    font-size: 13px;
+    transition: all .2s;
+  }
+  .player.eliminated {
+    opacity: .4;
+    border-left-color: var(--red);
+    text-decoration: line-through;
+  }
+  .player-name { font-weight: 600; color: var(--ivory); }
+  .player-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+  }
+  .player-actions { display: flex; gap: 4px; }
+
+  /* Structure table */
+  .structure-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .structure-table th {
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(201,164,73,.3);
+    font-size: 10px;
+    text-align: center;
+  }
+  .structure-table td {
+    padding: 6px 4px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    color: var(--cream);
+  }
+  .structure-table tr.current { background: rgba(201,164,73,.15); }
+  .structure-table tr.current td { color: var(--gold-bright); font-weight: 700; }
+  .structure-table tr.break-row td { color: var(--red-bright); font-style: italic; }
+  .structure-table input.cell {
+    background: rgba(0,0,0,.4);
+    border: 1px solid rgba(201,164,73,.2);
+    color: var(--cream);
+    width: 100%;
+    padding: 4px 6px;
+    text-align: center;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .structure-table input.cell:focus { outline: none; border-color: var(--gold); background: rgba(0,0,0,.6); }
+  .structure-table .row-actions { display: flex; gap: 3px; justify-content: center; }
+  .structure-table .row-actions button { padding: 2px 6px; font-size: 11px; letter-spacing: 0; min-width: 0; }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal-backdrop.active { display: flex; }
+  .modal {
+    background: linear-gradient(180deg, var(--felt-light), var(--felt-deep));
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h2 { margin-bottom: 16px; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+  .form-row label { display: block; font-size: 11px; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 4px; }
+
+  .rebuy-status {
+    padding: 8px 12px;
+    background: rgba(0,0,0,.3);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--gold);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+  .rebuy-status.closed { color: var(--red-bright); }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    body { overflow: auto; height: auto; }
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+      height: auto;
+    }
+    .side {
+      grid-column: 1;
+      grid-row: 3;
+      overflow: visible;
+      max-height: none;
+    }
+    main { grid-row: 2; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .blinds-row { gap: 10px; }
+    .app { padding: 12px; }
+    .brand { font-size: 22px; }
+  }
+
+  /* Theme picker */
+  .theme-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .theme-swatch {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all .2s;
+  }
+  .theme-swatch:hover { background: rgba(255,255,255,.05); }
+  .theme-swatch.active { border-color: var(--gold); background: rgba(var(--accent-rgb), .12); }
+  .theme-preview {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    border: 2px solid;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4), inset 0 0 20px rgba(0,0,0,.3);
+    transition: transform .2s;
+  }
+  .theme-swatch:hover .theme-preview { transform: scale(1.05); }
+  .theme-swatch span:last-child {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* Footer copyright */
+  .footer-credit {
+    position: fixed;
+    bottom: 6px;
+    right: 14px;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: var(--gold-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    z-index: 5;
+    pointer-events: none;
+    user-select: none;
+    opacity: .7;
+  }
+  .footer-credit .heart {
+    color: var(--red-bright);
+    margin: 0 2px;
+  }
+
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--gold);
+    color: #1a1208;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-weight: 600;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    z-index: 200;
+    opacity: 0;
+    transition: opacity .3s;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Tables */
+  .poker-table {
+    background: linear-gradient(180deg, rgba(20,57,44,.7), rgba(10,31,23,.85));
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .poker-table.broken { opacity: .4; }
+  .poker-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(201,164,73,.2);
+  }
+  .poker-table-title {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    letter-spacing: 2px;
+    font-size: 13px;
+    text-transform: uppercase;
+  }
+  .seat-occupancy {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gold-bright);
+  }
+  .seats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .seat {
+    background: rgba(0,0,0,.35);
+    border: 1px solid rgba(201,164,73,.15);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    min-height: 32px;
+  }
+  .seat.empty { color: var(--gold-dim); font-style: italic; opacity: .5; }
+  .seat.occupied { cursor: pointer; transition: all .15s; }
+  .seat.occupied:hover { background: rgba(201,164,73,.15); border-color: var(--gold); }
+  .seat.reserved {
+    cursor: pointer;
+    background: rgba(184,37,44,.15);
+    border-color: rgba(184,37,44,.4);
+    opacity: .65;
+  }
+  .seat.reserved .seat-name { text-decoration: line-through; color: var(--gold-dim); }
+  .seat.reserved:hover { background: rgba(184,37,44,.3); opacity: .9; }
+  .seat-num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--gold);
+    font-size: 9px;
+    background: rgba(0,0,0,.4);
+    padding: 1px 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .seat-name {
+    color: var(--ivory);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    font-size: 11px;
+  }
+  .table-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    justify-content: flex-end;
+  }
+
+  /* Spotify player */
+  .spotify-player {
+    background: linear-gradient(135deg, #1db954 0%, #1aa34a 100%);
+    border-radius: 8px;
+    padding: 14px;
+    color: #fff;
+  }
+  .spotify-player.disconnected {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 1px solid rgba(29,185,84,.4);
+  }
+  .spotify-track {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .spotify-art {
+    width: 56px; height: 56px;
+    border-radius: 4px;
+    background: rgba(0,0,0,.3);
+    flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
+  }
+  .spotify-info { flex: 1; min-width: 0; }
+  .spotify-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .spotify-artist {
+    font-size: 11px;
+    color: rgba(255,255,255,.75);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+  .spotify-controls {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+  }
+  .spotify-controls button {
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.2);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 50%;
+    width: 36px; height: 36px;
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .spotify-controls button.play-pause {
+    background: #fff;
+    color: #1db954;
+    width: 44px; height: 44px;
+    font-size: 16px;
+  }
+  .spotify-controls button:hover { transform: scale(1.08); border-color: #fff; }
+  .spotify-volume {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 11px;
+  }
+  .spotify-volume input[type=range] {
+    flex: 1;
+    accent-color: #fff;
+    background: transparent;
+  }
+  .spotify-progress {
+    margin-top: 8px;
+    height: 3px;
+    background: rgba(0,0,0,.3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .spotify-progress-bar {
+    height: 100%;
+    background: #fff;
+    transition: width .3s linear;
+  }
+  .spotify-playlists {
+    margin-top: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .spotify-playlist-item {
+    background: rgba(0,0,0,.3);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #fff;
+    display: flex; gap: 8px; align-items: center;
+    transition: background .15s;
+  }
+  .spotify-playlist-item:hover { background: rgba(0,0,0,.5); }
+  .spotify-playlist-img {
+    width: 28px; height: 28px;
+    background: rgba(0,0,0,.4);
+    background-size: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .spotify-playlist-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1;
+  }
+  .spotify-ducking-info {
+    margin-top: 8px;
+    font-size: 10px;
+    color: rgba(255,255,255,.7);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  /* Audio settings */
+  .sound-row {
+    display: grid;
+    grid-template-columns: 1fr 160px 60px;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .sound-row label { font-size: 12px; color: var(--cream); }
+  .sound-row select { width: 100%; padding: 4px 6px; font-size: 11px; }
+  .sound-row button { padding: 4px 8px; font-size: 10px; min-width: 0; }
+  .custom-sound-upload {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(0,0,0,.3);
+    border-radius: 4px;
+    border: 1px dashed var(--gold-dim);
+  }
+  .custom-sound-upload label {
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+  input[type="file"] {
+    color: var(--cream);
+    font-size: 11px;
+    padding: 4px;
+  }
+  input[type="range"].volume-slider {
+    width: 100%;
+    accent-color: var(--gold);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      ♠ POKER MANAGER ♠<br>
+      <small>DEEP STACK · SKWAL EDITION</small>
+    </div>
+    <div class="header-actions">
+      <button onclick="openSettings()">⚙ Réglages</button>
+      <button onclick="openStructure()">📋 Structure</button>
+      <button onclick="openAudio()">🔊 Audio</button>
+      <button onclick="openSpotifySetup()">♫ Spotify</button>
+      <button class="red ghost" onclick="resetTournament()">↺ Reset</button>
+    </div>
+  </header>
+
+  <!-- LEFT : main timer + stats -->
+  <main>
+    <div class="timer-card">
+      <div class="level-label" id="levelLabel">NIVEAU</div>
+      <div class="level-num" id="levelNum">1</div>
+
+      <div class="blinds-row">
+        <div class="blind-block">
+          <div class="label">Small Blind</div>
+          <div class="value" id="sbValue">50</div>
+        </div>
+        <div class="blind-sep">/</div>
+        <div class="blind-block">
+          <div class="label">Big Blind</div>
+          <div class="value" id="bbValue">100</div>
+        </div>
+      </div>
+
+      <div class="ante-row" id="anteRow" style="display:none;">
+        ANTE <span class="ante-val" id="anteValue">0</span>
+      </div>
+
+      <div class="timer-display" id="timerDisplay">20:00</div>
+
+      <div class="next-level" id="nextLevel">
+        Prochain : <strong id="nextLevelText">SB 75 / BB 150</strong>
+      </div>
+
+      <div class="controls">
+        <button onclick="prevLevel()">⏮ Préc.</button>
+        <button onclick="adjustTime(-60)">−1 min</button>
+        <button class="gold play-btn" id="playBtn" onclick="toggleTimer()">▶ DÉMARRER</button>
+        <button onclick="adjustTime(60)">+1 min</button>
+        <button onclick="nextLevel()">Suiv. ⏭</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="label">Joueurs</div>
+          <div class="value"><span id="activePlayers">0</span><span style="color:var(--gold-dim); font-size:18px;"> / <span id="totalPlayers">0</span></span></div>
+          <div class="sub">restants / total</div>
+        </div>
+        <div class="stat">
+          <div class="label">Avg Stack</div>
+          <div class="value" id="avgStack">—</div>
+          <div class="sub" id="avgStackBb">— BB</div>
+        </div>
+        <div class="stat">
+          <div class="label">Prize Pool</div>
+          <div class="value" id="prizePool">0 €</div>
+          <div class="sub" id="bountyPool">Bounty : 0 €</div>
+        </div>
+        <div class="stat">
+          <div class="label">Total Chips</div>
+          <div class="value" id="totalChips">0</div>
+          <div class="sub" id="rebuysCount">0 rebuys</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT : players + payouts -->
+  <aside class="side">
+    <div class="panel">
+      <h2>Joueurs <span class="count" id="playerCount">0</span></h2>
+
+      <div class="rebuy-status" id="rebuyStatus">
+        🟢 REBUY OUVERT — Fin level 6
+      </div>
+
+      <div class="add-player">
+        <input type="text" id="newPlayerName" placeholder="Nom du joueur" onkeydown="if(event.key==='Enter')addPlayer()">
+        <button class="gold" onclick="addPlayer()">+</button>
+      </div>
+
+      <div class="player-list" id="playerList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Tables <span class="count" id="tablesCount">—</span></h2>
+      <div style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+        <button class="tiny gold" onclick="openTablesConfig()">⚙ Config</button>
+        <button class="tiny" onclick="seatRandom()">🎲 Tirage</button>
+        <button class="tiny" onclick="suggestBalance()">⚖ Équilibrer</button>
+      </div>
+      <div id="balanceHint" style="display:none; padding:8px 10px; background:rgba(201,164,73,.12); border:1px solid var(--gold-dim); border-radius:4px; font-size:11px; margin-bottom:10px; color:var(--gold-bright); line-height:1.5;"></div>
+      <div id="tablesView"></div>
+    </div>
+
+    <div class="panel">
+      <h2>♫ Musique <span class="count" id="spotifyStatus">—</span></h2>
+      <div id="spotifyPanel"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Payouts <span class="count" id="prizeTotal">0 €</span></h2>
+      <div id="payoutList" style="font-family:'JetBrains Mono', monospace; font-size:14px;"></div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- Modal : Settings -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Réglages du Tournoi</h2>
+    <div class="form-row">
+      <div>
+        <label>Buy-in (cave) €</label>
+        <input type="number" id="setBuyin" value="20">
+      </div>
+      <div>
+        <label>Bounty €</label>
+        <input type="number" id="setBounty" value="5">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Stack départ</label>
+        <input type="number" id="setStartStack" value="20000">
+      </div>
+      <div>
+        <label>Durée level (min)</label>
+        <input type="number" id="setLevelDuration" value="20">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Dernier level rebuy</label>
+        <input type="number" id="setRebuyEndLevel" value="6">
+      </div>
+      <div>
+        <label>Stack rebuy</label>
+        <input type="number" id="setRebuyStack" value="20000">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Payouts % (séparés par virgule)</label>
+        <input type="text" id="setPayouts" value="50,30,20">
+      </div>
+      <div>
+        <label>Son alertes</label>
+        <select id="setSound">
+          <option value="on">Activé</option>
+          <option value="off">Désactivé</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:18px; padding-top:14px; border-top:1px solid rgba(201,164,73,.15);">
+      <label style="font-size:11px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:10px;">Thème visuel</label>
+      <div class="theme-picker">
+        <div class="theme-swatch" data-theme="casino" onclick="pickTheme('casino')" title="Casino (défaut)">
+          <div class="theme-preview" style="background:linear-gradient(135deg, #14392c, #0a1f17); border-color:#c9a449;">
+            <span style="color:#c9a449;">♠</span>
+          </div>
+          <span>Casino</span>
+        </div>
+        <div class="theme-swatch" data-theme="onyx" onclick="pickTheme('onyx')" title="Onyx (noir)">
+          <div class="theme-preview" style="background:linear-gradient(135deg, #1f1f1f, #050505); border-color:#d4af37;">
+            <span style="color:#d4af37;">♠</span>
+          </div>
+          <span>Onyx</span>
+        </div>
+        <div class="theme-swatch" data-theme="crimson" onclick="pickTheme('crimson')" title="Crimson (rouge)">
+          <div class="theme-preview" style="background:linear-gradient(135deg, #3d1117, #1a0608); border-color:#e0b04a;">
+            <span style="color:#e0b04a;">♥</span>
+          </div>
+          <span>Crimson</span>
+        </div>
+        <div class="theme-swatch" data-theme="sapphire" onclick="pickTheme('sapphire')" title="Sapphire (bleu)">
+          <div class="theme-preview" style="background:linear-gradient(135deg, #122242, #050e1c); border-color:#6fb3ff;">
+            <span style="color:#6fb3ff;">♦</span>
+          </div>
+          <span>Sapphire</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button onclick="closeModal('settingsModal')">Annuler</button>
+      <button class="gold" onclick="saveSettings()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Structure -->
+<div class="modal-backdrop" id="structureModal">
+  <div class="modal" style="max-width:780px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Structure des Blinds</h2>
+    <p style="font-size:12px; color:var(--gold-dim); margin-bottom:12px;">
+      Édite directement les valeurs · La ligne <span style="color:var(--gold-bright);">surlignée</span> est le niveau actuel · "Durée" en minutes
+    </p>
+    <div style="max-height:55vh; overflow-y:auto;">
+      <table class="structure-table" id="structureTable"></table>
+    </div>
+    <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+      <button class="gold" onclick="addLevel()">+ Niveau</button>
+      <button onclick="addBreak()">+ Pause</button>
+      <button class="ghost" onclick="resetStructure()" style="margin-left:auto;">↺ Structure par défaut</button>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+      <button onclick="closeModal('structureModal')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Eliminate (bounty) -->
+<div class="modal-backdrop" id="eliminateModal">
+  <div class="modal" style="max-width:400px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Élimination</h2>
+    <p style="margin-bottom:14px; font-size:13px;">Qui a sorti <strong id="elimVictim" style="color:var(--gold);"></strong> ?</p>
+    <select id="elimKiller" style="margin-bottom:14px;"></select>
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <button onclick="closeModal('eliminateModal')">Annuler</button>
+      <button class="red" onclick="confirmEliminate()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Tables config -->
+<div class="modal-backdrop" id="tablesConfigModal">
+  <div class="modal" style="max-width:480px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Configuration Tables</h2>
+    <div class="form-row">
+      <div>
+        <label>Nombre de tables</label>
+        <input type="number" id="setNumTables" min="1" max="20" value="2">
+      </div>
+      <div>
+        <label>Sièges max / table</label>
+        <input type="number" id="setSeatsPerTable" min="2" max="9" value="9">
+      </div>
+    </div>
+    <div class="form-row">
+      <div>
+        <label>Casser une table à partir de</label>
+        <input type="number" id="setBreakThreshold" min="2" max="9" value="8">
+      </div>
+      <div style="display:flex; align-items:flex-end; font-size:11px; color:var(--gold-dim); padding-bottom:8px;">
+        ≤ N joueurs restants = consolidation possible
+      </div>
+    </div>
+    <p style="font-size:11px; color:var(--gold-dim); margin-top:8px; line-height:1.5;">
+      💡 Pour 10 joueurs en 2 tables de 5, mets 2 tables / 9 sièges max / casse à 8.<br>
+      Pour 12 joueurs en 2 tables de 6, mets 2 tables / 9 sièges max / casse à 8.
+    </p>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button onclick="closeModal('tablesConfigModal')">Annuler</button>
+      <button class="gold" onclick="saveTablesConfig()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Audio settings -->
+<div class="modal-backdrop" id="audioModal">
+  <div class="modal" style="max-width:600px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Sons & Alertes</h2>
+
+    <div style="margin-bottom:14px; display:flex; gap:12px; align-items:center;">
+      <label style="font-size:12px; color:var(--gold); letter-spacing:1px; text-transform:uppercase;">Volume global</label>
+      <input type="range" class="volume-slider" id="setMasterVolume" min="0" max="100" step="5" style="flex:1;" oninput="document.getElementById('masterVolLabel').textContent=this.value+'%'">
+      <span id="masterVolLabel" style="font-family:'JetBrains Mono', monospace; color:var(--gold-bright); width:40px; text-align:right;">70%</span>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12px;">
+        <input type="checkbox" id="setSoundsEnabled" style="width:auto;">
+        <span>Sons d'alerte activés</span>
+      </label>
+    </div>
+
+    <h3 style="font-family:'Cinzel',serif; color:var(--gold-bright); font-size:13px; letter-spacing:2px; margin:16px 0 8px; text-transform:uppercase;">Sons par événement</h3>
+
+    <div class="sound-row">
+      <label>⏱ Fin de niveau</label>
+      <select id="sound_levelEnd"></select>
+      <button onclick="testSound('levelEnd')">▶ Test</button>
+    </div>
+    <div class="sound-row">
+      <label>⚠ 1 minute restante</label>
+      <select id="sound_oneMinute"></select>
+      <button onclick="testSound('oneMinute')">▶ Test</button>
+    </div>
+    <div class="sound-row">
+      <label>🍔 Début de pause</label>
+      <select id="sound_breakStart"></select>
+      <button onclick="testSound('breakStart')">▶ Test</button>
+    </div>
+    <div class="sound-row">
+      <label>🔔 Fin de pause</label>
+      <select id="sound_breakEnd"></select>
+      <button onclick="testSound('breakEnd')">▶ Test</button>
+    </div>
+    <div class="sound-row">
+      <label>💥 Élimination</label>
+      <select id="sound_elimination"></select>
+      <button onclick="testSound('elimination')">▶ Test</button>
+    </div>
+
+    <div class="custom-sound-upload">
+      <label>+ Ajouter un son custom (mp3, wav, ogg)</label>
+      <input type="file" id="customSoundFile" accept="audio/*" onchange="uploadCustomSound(this)">
+      <div id="customSoundsList" style="margin-top:8px; font-size:11px;"></div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button onclick="closeModal('audioModal')">Annuler</button>
+      <button class="gold" onclick="saveAudio()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : Spotify setup -->
+<div class="modal-backdrop" id="spotifyModal">
+  <div class="modal" style="max-width:620px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Configuration Spotify</h2>
+
+    <div id="spotifyInstructions" style="background:rgba(29,185,84,.1); border:1px solid rgba(29,185,84,.4); border-radius:6px; padding:12px; margin-bottom:14px; font-size:12px; line-height:1.6;">
+      <strong style="color:#1db954;">📋 Setup en 4 étapes :</strong><br>
+      <ol style="margin:8px 0 0 18px; padding:0;">
+        <li>Va sur <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:#1db954;">developer.spotify.com/dashboard</a> et crée une app (n'importe quel nom)</li>
+        <li>Dans les settings de l'app, ajoute comme <strong>Redirect URI</strong> :<br>
+          <code id="currentRedirectUri" style="display:block; background:rgba(0,0,0,.4); padding:6px; border-radius:3px; margin:4px 0; color:var(--gold-bright); font-family:'JetBrains Mono',monospace; font-size:11px;"></code>
+          ⚠️ Si tu vois <code>file://</code> ci-dessus : l'OAuth Spotify refuse <code>file://</code>. Lance le fichier via un mini-serveur :<br>
+          <code style="background:rgba(0,0,0,.4); padding:4px 6px; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:11px;">python3 -m http.server 8080</code><br>
+          puis ouvre <code>http://127.0.0.1:8080/poker-manager.html</code> et tu verras le bon redirect URI. Une fois connecté, tu pourras revenir en <code>file://</code> et le refresh token continuera à fonctionner.
+        </li>
+        <li>Copie le <strong>Client ID</strong> de ton app et colle-le ci-dessous</li>
+        <li>Connecte-toi · Lance ensuite Spotify sur ton téléphone, ordi ou enceinte — le poker manager le pilote à distance</li>
+      </ol>
+      <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(29,185,84,.2); font-size:11px; opacity:.85;">
+        💡 <strong>Premium requis</strong> pour les contrôles (play/pause/skip/volume). C'est une limitation de l'API Spotify, pas de cette app.
+      </div>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:4px;">Spotify Client ID</label>
+      <input type="text" id="spotifyClientId" placeholder="ex: 4f8e3a2b9c1d..." style="font-family:'JetBrains Mono',monospace; font-size:12px;">
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12px;">
+        <input type="checkbox" id="spotifyDucking" style="width:auto;" checked>
+        <span>Baisser le volume Spotify pendant les alertes (ducking)</span>
+      </label>
+    </div>
+
+    <div id="spotifyAuthSection" style="display:none; padding:12px; background:rgba(0,0,0,.3); border-radius:6px; margin-bottom:14px; text-align:center;">
+      <p style="font-size:13px; margin-bottom:10px;">Client ID enregistré. Connecte-toi à Spotify :</p>
+      <button class="gold" onclick="spotifyLogin()" style="background:#1db954; border-color:#1db954; color:#fff;">♫ Se connecter à Spotify</button>
+    </div>
+
+    <div id="spotifyConnectedSection" style="display:none; padding:12px; background:rgba(29,185,84,.15); border:1px solid #1db954; border-radius:6px; margin-bottom:14px; text-align:center;">
+      <p style="font-size:13px; color:#1db954; margin-bottom:10px;">✓ Connecté en tant que <strong id="spotifyUser">—</strong></p>
+      <button onclick="spotifyLogout()">Déconnecter</button>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button onclick="closeModal('spotifyModal')">Fermer</button>
+      <button class="gold" onclick="saveSpotifyConfig()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop" id="moveModal">
+  <div class="modal" style="max-width:420px;">
+    <h2 style="font-family:'Cinzel',serif; color:var(--gold); letter-spacing:3px; text-transform:uppercase; font-size:18px;">Déplacer un joueur</h2>
+    <p style="margin-bottom:14px; font-size:13px;">Déplacer <strong id="moveName" style="color:var(--gold);"></strong> vers :</p>
+    <select id="moveTarget" style="margin-bottom:14px;"></select>
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <button onclick="closeModal('moveModal')">Annuler</button>
+      <button class="gold" onclick="confirmMove()">Déplacer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="footer-credit">
+  ♠ POKER MANAGER · CRAFTED WITH <span class="heart">♥</span> · SKWAL EDITION ♠
+</div>
+
+<script>
+/* ============================================
+   POKER MANAGER — Deep Stack + Bounty
+   Single-file HTML5, localStorage persistence
+   ============================================ */
+
+const STORAGE_KEY = 'pokerManagerState_v1';
+
+// Default structure: 12 levels + 2 breaks, deep stack.
+// `duration` omitted on levels -> falls back to state.settings.levelDuration (20 min)
+const DEFAULT_STRUCTURE = [
+  { type: 'level', sb: 50,   bb: 100,  ante: 0 },
+  { type: 'level', sb: 75,   bb: 150,  ante: 0 },
+  { type: 'level', sb: 100,  bb: 200,  ante: 0 },
+  { type: 'level', sb: 150,  bb: 300,  ante: 0 },
+  { type: 'break', duration: 10 },
+  { type: 'level', sb: 200,  bb: 400,  ante: 0 },
+  { type: 'level', sb: 300,  bb: 600,  ante: 75 },
+  { type: 'level', sb: 400,  bb: 800,  ante: 100 },
+  { type: 'level', sb: 500,  bb: 1000, ante: 100 },
+  { type: 'break', duration: 10 },
+  { type: 'level', sb: 700,  bb: 1400, ante: 200 },
+  { type: 'level', sb: 1000, bb: 2000, ante: 300 },
+  { type: 'level', sb: 1500, bb: 3000, ante: 400 },
+  { type: 'level', sb: 2000, bb: 4000, ante: 500 },
+  { type: 'level', sb: 3000, bb: 6000, ante: 1000 },
+];
+
+let state = {
+  settings: {
+    buyin: 20,
+    bounty: 5,
+    startStack: 20000,
+    levelDuration: 20,   // minutes
+    rebuyEndLevel: 6,
+    rebuyStack: 20000,
+    payouts: [50, 30, 20],
+    sound: 'on',
+    numTables: 2,
+    seatsPerTable: 9,
+    breakThreshold: 8,   // when active players <= this, consolidation possible
+    theme: 'casino',     // casino | onyx | crimson | sapphire
+  },
+  audio: {
+    enabled: true,
+    masterVolume: 0.7,
+    sounds: {
+      levelEnd: 'chime_double',
+      oneMinute: 'beep_short',
+      breakStart: 'bell_soft',
+      breakEnd: 'chime_triple',
+      elimination: 'casino_chip',
+    },
+    customSounds: {}, // { id: { name, dataUrl } }
+  },
+  spotify: {
+    clientId: '',
+    accessToken: null,
+    refreshToken: null,
+    expiresAt: null,
+    deviceId: null,
+    user: null,
+    ducking: true,
+    lastVolume: 0.5, // for restoring after ducking
+  },
+  structure: structuredClone(DEFAULT_STRUCTURE),
+  currentIdx: 0,
+  timeLeft: 20 * 60,    // seconds
+  running: false,
+  players: [],          // {id, name, buyins, rebuys, eliminated, eliminatedAt, killedBy, bountiesWon, tableId, seat}
+  nextPlayerId: 1,
+  tablesBroken: [],     // array of table ids that have been broken (closed)
+};
+
+let timerInterval = null;
+
+// ============== PERSISTENCE ==============
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('save failed', e);
+  }
+}
+
+// Deep merge default state with saved state to preserve new keys
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  let saved;
+  try { saved = JSON.parse(raw); } catch (e) { console.warn('corrupt state', e); return; }
+
+  // Recursive merge: saved values win, but default keys are preserved if missing in saved
+  function merge(defaults, override) {
+    if (!override || typeof override !== 'object' || Array.isArray(override)) return override;
+    if (!defaults || typeof defaults !== 'object' || Array.isArray(defaults)) return override;
+    const out = { ...defaults };
+    for (const k of Object.keys(override)) {
+      if (override[k] && typeof override[k] === 'object' && !Array.isArray(override[k])
+          && defaults[k] && typeof defaults[k] === 'object' && !Array.isArray(defaults[k])) {
+        out[k] = merge(defaults[k], override[k]);
+      } else {
+        out[k] = override[k];
+      }
+    }
+    return out;
+  }
+
+  try {
+    state = merge(state, saved);
+  } catch (e) {
+    console.error('state merge failed, using defaults', e);
+  }
+}
+
+// ============== TIMER ==============
+function getCurrentSegment() { return state.structure[state.currentIdx]; }
+
+function isBreak(seg) { return seg && seg.type === 'break'; }
+
+function segmentDurationSec(seg) {
+  if (!seg) return 0;
+  if (seg.type === 'break') return (seg.duration || 10) * 60;
+  // Per-level duration overrides global setting
+  return (seg.duration || state.settings.levelDuration) * 60;
+}
+
+function levelNumberAtIdx(idx) {
+  // count only 'level' segments up to and including idx
+  let n = 0;
+  for (let i = 0; i <= idx; i++) {
+    if (state.structure[i] && state.structure[i].type === 'level') n++;
+  }
+  return n;
+}
+
+function currentLevelNumber() { return levelNumberAtIdx(state.currentIdx); }
+
+function nextLevelInfo() {
+  for (let i = state.currentIdx + 1; i < state.structure.length; i++) {
+    const s = state.structure[i];
+    if (s.type === 'level') {
+      return `SB ${s.sb.toLocaleString('fr-FR')} / BB ${s.bb.toLocaleString('fr-FR')}${s.ante ? ' · Ante ' + s.ante : ''}`;
+    }
+    if (s.type === 'break') {
+      return `🍔 PAUSE ${s.duration} min après ce niveau`;
+    }
+  }
+  return 'Fin de structure';
+}
+
+function toggleTimer() {
+  state.running = !state.running;
+  if (state.running) {
+    timerInterval = setInterval(tick, 1000);
+  } else {
+    clearInterval(timerInterval);
+  }
+  render();
+  save();
+}
+
+function tick() {
+  state.timeLeft--;
+  const seg = getCurrentSegment();
+  if (state.timeLeft === 60) {
+    playEventSound('oneMinute');
+  }
+  if (state.timeLeft <= 0) {
+    // Different sound depending on what's ending
+    if (isBreak(seg)) {
+      playEventSound('breakEnd');
+    } else {
+      // Check if next segment is a break
+      const next = state.structure[state.currentIdx + 1];
+      if (next && next.type === 'break') {
+        playEventSound('breakStart');
+      } else {
+        playEventSound('levelEnd');
+      }
+    }
+    advanceSegment();
+  }
+  renderTimer();
+  // Save every 5s
+  if (state.timeLeft % 5 === 0) save();
+}
+
+function advanceSegment() {
+  if (state.currentIdx < state.structure.length - 1) {
+    state.currentIdx++;
+    state.timeLeft = segmentDurationSec(getCurrentSegment());
+    freeSeatsOfOutPlayers();
+  } else {
+    state.running = false;
+    clearInterval(timerInterval);
+    showToast('🏆 Fin de structure !');
+  }
+  render();
+  save();
+}
+
+function nextLevel() {
+  if (state.currentIdx < state.structure.length - 1) {
+    state.currentIdx++;
+    state.timeLeft = segmentDurationSec(getCurrentSegment());
+    freeSeatsOfOutPlayers();
+    render(); save();
+  }
+}
+
+function prevLevel() {
+  if (state.currentIdx > 0) {
+    state.currentIdx--;
+    state.timeLeft = segmentDurationSec(getCurrentSegment());
+    render(); save();
+  }
+}
+
+function adjustTime(delta) {
+  state.timeLeft = Math.max(0, state.timeLeft + delta);
+  renderTimer(); save();
+}
+
+// ============== AUDIO ENGINE ==============
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+// Synth sound library — generated via Web Audio API
+const SYNTH_SOUNDS = {
+  none: { label: '— Aucun —', play: () => {} },
+  beep_short: {
+    label: 'Bip court',
+    play: (vol) => playOscillator([{ freq: 880, dur: 0.18, type: 'sine' }], vol),
+  },
+  beep_double: {
+    label: 'Bip double',
+    play: (vol) => playOscillator([
+      { freq: 880, dur: 0.12, type: 'sine' },
+      { freq: 0, dur: 0.08 },
+      { freq: 880, dur: 0.12, type: 'sine' },
+    ], vol),
+  },
+  chime_double: {
+    label: 'Carillon double',
+    play: (vol) => playOscillator([
+      { freq: 660, dur: 0.25, type: 'sine' },
+      { freq: 0, dur: 0.05 },
+      { freq: 880, dur: 0.45, type: 'sine' },
+    ], vol),
+  },
+  chime_triple: {
+    label: 'Carillon triple',
+    play: (vol) => playOscillator([
+      { freq: 523, dur: 0.18, type: 'sine' },
+      { freq: 0, dur: 0.05 },
+      { freq: 659, dur: 0.18, type: 'sine' },
+      { freq: 0, dur: 0.05 },
+      { freq: 784, dur: 0.45, type: 'sine' },
+    ], vol),
+  },
+  bell_soft: {
+    label: 'Cloche douce',
+    play: (vol) => playOscillator([{ freq: 587, dur: 0.9, type: 'sine', attack: 0.02, release: 0.85 }], vol),
+  },
+  alarm: {
+    label: 'Alarme',
+    play: (vol) => playOscillator([
+      { freq: 1000, dur: 0.15, type: 'square' },
+      { freq: 600, dur: 0.15, type: 'square' },
+      { freq: 1000, dur: 0.15, type: 'square' },
+      { freq: 600, dur: 0.15, type: 'square' },
+    ], vol),
+  },
+  casino_chip: {
+    label: 'Jeton de casino',
+    play: (vol) => {
+      const ctx = getAudioCtx();
+      // White noise burst, filtered, short = chip falling
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 3500;
+      filter.Q.value = 4;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.6 * vol;
+      src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      src.start();
+    },
+  },
+  fanfare: {
+    label: 'Fanfare',
+    play: (vol) => playOscillator([
+      { freq: 523, dur: 0.15, type: 'triangle' },
+      { freq: 659, dur: 0.15, type: 'triangle' },
+      { freq: 784, dur: 0.15, type: 'triangle' },
+      { freq: 1047, dur: 0.5, type: 'triangle' },
+    ], vol),
+  },
+  buzz: {
+    label: 'Buzz',
+    play: (vol) => playOscillator([{ freq: 150, dur: 0.5, type: 'sawtooth' }], vol),
+  },
+  gong: {
+    label: 'Gong',
+    play: (vol) => playOscillator([
+      { freq: 110, dur: 1.8, type: 'sine', attack: 0.005, release: 1.7 },
+      { freq: 220, dur: 1.8, type: 'sine', attack: 0.005, release: 1.7, gainMult: 0.4 },
+    ], vol, true),
+  },
+};
+
+function playOscillator(notes, vol, parallel = false) {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  let t = ctx.currentTime;
+  notes.forEach(n => {
+    if (n.freq === 0) {
+      // silence
+      if (!parallel) t += n.dur;
+      return;
+    }
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = n.type || 'sine';
+    osc.frequency.value = n.freq;
+    const peakGain = 0.3 * vol * (n.gainMult || 1);
+    const attack = n.attack || 0.01;
+    const release = n.release || n.dur * 0.6;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(peakGain, t + attack);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + n.dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + n.dur + 0.05);
+    if (!parallel) t += n.dur;
+  });
+}
+
+function allSoundOptions() {
+  // Synth + custom uploaded
+  const opts = Object.entries(SYNTH_SOUNDS).map(([id, s]) => ({ id, label: s.label }));
+  Object.entries(state.audio.customSounds || {}).forEach(([id, s]) => {
+    opts.push({ id: 'custom:' + id, label: '📁 ' + s.name });
+  });
+  return opts;
+}
+
+function playEventSound(eventName) {
+  if (!state.audio.enabled) return;
+  const soundId = state.audio.sounds[eventName];
+  if (!soundId || soundId === 'none') return;
+  const vol = state.audio.masterVolume;
+
+  // Spotify ducking
+  duckSpotify(true);
+  setTimeout(() => duckSpotify(false), 1500);
+
+  if (soundId.startsWith('custom:')) {
+    const id = soundId.slice(7);
+    const custom = state.audio.customSounds[id];
+    if (!custom) return;
+    const audio = new Audio(custom.dataUrl);
+    audio.volume = vol;
+    audio.play().catch(e => console.warn('Custom sound play failed:', e));
+    return;
+  }
+
+  const sound = SYNTH_SOUNDS[soundId];
+  if (sound) sound.play(vol);
+}
+
+function testSound(eventName) {
+  // Read current selected value from the UI, not from state (allows preview before save)
+  const sel = document.getElementById('sound_' + eventName);
+  if (!sel) return;
+  const soundId = sel.value;
+  const vol = parseInt(document.getElementById('setMasterVolume').value) / 100;
+
+  if (soundId === 'none') { showToast('— Aucun son —'); return; }
+
+  if (soundId.startsWith('custom:')) {
+    const id = soundId.slice(7);
+    const custom = state.audio.customSounds[id];
+    if (!custom) return;
+    const audio = new Audio(custom.dataUrl);
+    audio.volume = vol;
+    audio.play().catch(e => console.warn('Test failed:', e));
+    return;
+  }
+  const sound = SYNTH_SOUNDS[soundId];
+  if (sound) sound.play(vol);
+}
+
+function uploadCustomSound(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('Fichier trop gros (max 5 Mo)');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const id = 'c' + Date.now();
+    if (!state.audio.customSounds) state.audio.customSounds = {};
+    state.audio.customSounds[id] = {
+      name: file.name.replace(/\.[^.]+$/, '').slice(0, 30),
+      dataUrl: e.target.result,
+    };
+    save();
+    renderCustomSoundsList();
+    rebuildSoundSelects();
+    showToast('Son ajouté');
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function deleteCustomSound(id) {
+  if (!confirm('Supprimer ce son ?')) return;
+  delete state.audio.customSounds[id];
+  // Reset any event that uses it
+  Object.keys(state.audio.sounds).forEach(ev => {
+    if (state.audio.sounds[ev] === 'custom:' + id) {
+      state.audio.sounds[ev] = 'none';
+    }
+  });
+  save();
+  renderCustomSoundsList();
+  rebuildSoundSelects();
+}
+
+function renderCustomSoundsList() {
+  const el = document.getElementById('customSoundsList');
+  if (!el) return;
+  const items = state.audio.customSounds || {};
+  const ids = Object.keys(items);
+  if (ids.length === 0) {
+    el.innerHTML = '<div style="opacity:.5;">Aucun son custom</div>';
+    return;
+  }
+  el.innerHTML = ids.map(id => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0;">
+      <span>🎵 ${escapeHtml(items[id].name)}</span>
+      <button class="tiny red" onclick="deleteCustomSound('${id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function rebuildSoundSelects() {
+  const opts = allSoundOptions();
+  ['levelEnd','oneMinute','breakStart','breakEnd','elimination'].forEach(ev => {
+    const sel = document.getElementById('sound_' + ev);
+    if (!sel) return;
+    const current = state.audio.sounds[ev] || 'none';
+    sel.innerHTML = opts.map(o =>
+      `<option value="${o.id}" ${o.id === current ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
+    ).join('');
+  });
+}
+
+function openAudio() {
+  document.getElementById('setMasterVolume').value = Math.round(state.audio.masterVolume * 100);
+  document.getElementById('masterVolLabel').textContent = Math.round(state.audio.masterVolume * 100) + '%';
+  document.getElementById('setSoundsEnabled').checked = state.audio.enabled;
+  rebuildSoundSelects();
+  renderCustomSoundsList();
+  openModal('audioModal');
+}
+
+function saveAudio() {
+  state.audio.masterVolume = parseInt(document.getElementById('setMasterVolume').value) / 100;
+  state.audio.enabled = document.getElementById('setSoundsEnabled').checked;
+  ['levelEnd','oneMinute','breakStart','breakEnd','elimination'].forEach(ev => {
+    state.audio.sounds[ev] = document.getElementById('sound_' + ev).value;
+  });
+  // Keep legacy field in sync
+  state.settings.sound = state.audio.enabled ? 'on' : 'off';
+  closeModal('audioModal');
+  showToast('Sons enregistrés');
+  save();
+}
+
+// ============== SPOTIFY (REST API + remote control) ==============
+let spotifyPlaylists = [];
+
+function getRedirectUri() {
+  // Same page, current URL minus hash/query
+  return location.origin + location.pathname;
+}
+
+function openSpotifySetup() {
+  document.getElementById('currentRedirectUri').textContent = getRedirectUri();
+  document.getElementById('spotifyClientId').value = state.spotify.clientId || '';
+  document.getElementById('spotifyDucking').checked = state.spotify.ducking;
+  if (state.spotify.accessToken && state.spotify.user) {
+    document.getElementById('spotifyAuthSection').style.display = 'none';
+    document.getElementById('spotifyConnectedSection').style.display = 'block';
+    document.getElementById('spotifyUser').textContent = state.spotify.user.display_name || 'Utilisateur';
+  } else if (state.spotify.clientId) {
+    document.getElementById('spotifyAuthSection').style.display = 'block';
+    document.getElementById('spotifyConnectedSection').style.display = 'none';
+  } else {
+    document.getElementById('spotifyAuthSection').style.display = 'none';
+    document.getElementById('spotifyConnectedSection').style.display = 'none';
+  }
+  openModal('spotifyModal');
+}
+
+function saveSpotifyConfig() {
+  state.spotify.clientId = document.getElementById('spotifyClientId').value.trim();
+  state.spotify.ducking = document.getElementById('spotifyDucking').checked;
+  save();
+  // Reopen to refresh auth section
+  closeModal('spotifyModal');
+  setTimeout(openSpotifySetup, 100);
+  showToast('Config Spotify enregistrée');
+}
+
+// PKCE helpers
+async function sha256(plain) {
+  const enc = new TextEncoder();
+  const data = enc.encode(plain);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return hash;
+}
+function base64UrlEncode(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+function generateRandomString(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let s = '';
+  for (let i = 0; i < length; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+async function spotifyLogin() {
+  if (!state.spotify.clientId) {
+    showToast('Configure d\'abord ton Client ID');
+    return;
+  }
+  const codeVerifier = generateRandomString(64);
+  const hashed = await sha256(codeVerifier);
+  const codeChallenge = base64UrlEncode(hashed);
+  sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+
+  const scope = [
+    'streaming',
+    'user-read-email',
+    'user-read-private',
+    'user-read-playback-state',
+    'user-modify-playback-state',
+    'user-read-currently-playing',
+    'playlist-read-private',
+    'playlist-read-collaborative',
+  ].join(' ');
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: state.spotify.clientId,
+    scope,
+    code_challenge_method: 'S256',
+    code_challenge: codeChallenge,
+    redirect_uri: getRedirectUri(),
+  });
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+}
+
+async function handleSpotifyCallback() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const error = params.get('error');
+  if (error) {
+    showToast('Spotify : ' + error);
+    history.replaceState({}, '', location.pathname);
+    return;
+  }
+  if (!code) return;
+
+  const codeVerifier = sessionStorage.getItem('spotify_code_verifier');
+  if (!codeVerifier || !state.spotify.clientId) {
+    history.replaceState({}, '', location.pathname);
+    return;
+  }
+
+  try {
+    const body = new URLSearchParams({
+      client_id: state.spotify.clientId,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: getRedirectUri(),
+      code_verifier: codeVerifier,
+    });
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    const data = await resp.json();
+    if (data.access_token) {
+      state.spotify.accessToken = data.access_token;
+      state.spotify.refreshToken = data.refresh_token;
+      state.spotify.expiresAt = Date.now() + (data.expires_in * 1000);
+      sessionStorage.removeItem('spotify_code_verifier');
+      history.replaceState({}, '', location.pathname);
+      await fetchSpotifyUser();
+      save();
+      showToast('✓ Spotify connecté');
+      startSpotifyPolling();
+      renderSpotifyPanel();
+    } else {
+      showToast('Échec auth Spotify : ' + (data.error_description || data.error || 'inconnu'));
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Erreur connexion Spotify');
+  }
+}
+
+async function refreshSpotifyToken() {
+  if (!state.spotify.refreshToken || !state.spotify.clientId) return false;
+  try {
+    const body = new URLSearchParams({
+      client_id: state.spotify.clientId,
+      grant_type: 'refresh_token',
+      refresh_token: state.spotify.refreshToken,
+    });
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    const data = await resp.json();
+    if (data.access_token) {
+      state.spotify.accessToken = data.access_token;
+      state.spotify.expiresAt = Date.now() + (data.expires_in * 1000);
+      if (data.refresh_token) state.spotify.refreshToken = data.refresh_token;
+      save();
+      return true;
+    }
+  } catch(e) { console.error(e); }
+  return false;
+}
+
+async function spotifyApi(endpoint, options = {}) {
+  // Auto-refresh if expired
+  if (state.spotify.expiresAt && Date.now() >= state.spotify.expiresAt - 30000) {
+    await refreshSpotifyToken();
+  }
+  const resp = await fetch('https://api.spotify.com/v1' + endpoint, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      'Authorization': 'Bearer ' + state.spotify.accessToken,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (resp.status === 401) {
+    if (await refreshSpotifyToken()) {
+      return spotifyApi(endpoint, options); // retry once
+    }
+    spotifyLogout();
+    return null;
+  }
+  if (resp.status === 204) return null; // No content
+  if (!resp.ok) return null;
+  return resp.json();
+}
+
+async function fetchSpotifyUser() {
+  const user = await spotifyApi('/me');
+  if (user) state.spotify.user = user;
+}
+
+async function fetchSpotifyPlaylists() {
+  const data = await spotifyApi('/me/playlists?limit=20');
+  if (data) spotifyPlaylists = data.items || [];
+  return spotifyPlaylists;
+}
+
+function spotifyLogout() {
+  state.spotify.accessToken = null;
+  state.spotify.refreshToken = null;
+  state.spotify.expiresAt = null;
+  state.spotify.user = null;
+  state.spotify.deviceId = null;
+  stopSpotifyPolling();
+  spotifyCurrentState = null;
+  save();
+  renderSpotifyPanel();
+  showToast('Déconnecté de Spotify');
+}
+
+// No SDK - we use REST polling instead.
+// Start polling when token is available.
+
+// ============== SPOTIFY REMOTE CONTROL (REST API only) ==============
+// We don't use the Web Playback SDK. Instead we control whichever Spotify device
+// the user has active (phone / desktop / speaker). This works under file:// after auth.
+
+let spotifyPollInterval = null;
+let spotifyCurrentState = null; // last polled /me/player response
+
+async function startSpotifyPolling() {
+  if (spotifyPollInterval) clearInterval(spotifyPollInterval);
+  // Initial fetch
+  await pollSpotifyState();
+  spotifyPollInterval = setInterval(pollSpotifyState, 3000);
+}
+
+function stopSpotifyPolling() {
+  if (spotifyPollInterval) { clearInterval(spotifyPollInterval); spotifyPollInterval = null; }
+}
+
+async function pollSpotifyState() {
+  if (!state.spotify.accessToken) return;
+  try {
+    const res = await spotifyApi('/me/player', { method: 'GET' });
+    // 204 No Content = no active device
+    if (res === null || res === undefined || res === '') {
+      spotifyCurrentState = null;
+    } else {
+      spotifyCurrentState = res;
+      // Track active device id
+      if (res.device && res.device.id) state.spotify.deviceId = res.device.id;
+    }
+    renderSpotifyPanel();
+  } catch (e) {
+    // silent - device may be off
+  }
+}
+
+async function fetchSpotifyDevices() {
+  try {
+    const res = await spotifyApi('/me/player/devices', { method: 'GET' });
+    return (res && res.devices) || [];
+  } catch (e) { return []; }
+}
+
+async function transferToDevice(deviceId) {
+  try {
+    await spotifyApi('/me/player', {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: [deviceId], play: false }),
+    });
+    state.spotify.deviceId = deviceId;
+    save();
+    setTimeout(pollSpotifyState, 500);
+    showToast('Lecture transférée');
+  } catch (e) {
+    showToast('Erreur transfert : device introuvable');
+  }
+}
+
+async function spotifyTogglePlay() {
+  if (!state.spotify.accessToken) return;
+  const isPlaying = spotifyCurrentState && spotifyCurrentState.is_playing;
+  try {
+    await spotifyApi(isPlaying ? '/me/player/pause' : '/me/player/play', { method: 'PUT' });
+    setTimeout(pollSpotifyState, 300);
+  } catch (e) { showToast('Aucun device actif - lance Spotify ailleurs d\'abord'); }
+}
+
+async function spotifyNext() {
+  if (!state.spotify.accessToken) return;
+  try {
+    await spotifyApi('/me/player/next', { method: 'POST' });
+    setTimeout(pollSpotifyState, 300);
+  } catch (e) { showToast('Erreur'); }
+}
+
+async function spotifyPrev() {
+  if (!state.spotify.accessToken) return;
+  try {
+    await spotifyApi('/me/player/previous', { method: 'POST' });
+    setTimeout(pollSpotifyState, 300);
+  } catch (e) { showToast('Erreur'); }
+}
+
+async function spotifySetVolume(v) {
+  // v is 0..1
+  if (!state.spotify.accessToken) return;
+  state.spotify.lastVolume = v;
+  save();
+  try {
+    await spotifyApi(`/me/player/volume?volume_percent=${Math.round(v * 100)}`, { method: 'PUT' });
+  } catch (e) { /* some devices don't support volume control */ }
+}
+
+async function duckSpotify(on) {
+  if (!state.spotify.ducking || !state.spotify.accessToken) return;
+  const current = spotifyCurrentState && spotifyCurrentState.device
+    ? (spotifyCurrentState.device.volume_percent / 100)
+    : (state.spotify.lastVolume || 0.5);
+  if (on) {
+    state.spotify.lastVolume = current;
+    save();
+    try {
+      await spotifyApi(`/me/player/volume?volume_percent=${Math.max(5, Math.round(current * 100 * 0.2))}`, { method: 'PUT' });
+    } catch (e) {}
+  } else {
+    try {
+      await spotifyApi(`/me/player/volume?volume_percent=${Math.round((state.spotify.lastVolume || 0.5) * 100)}`, { method: 'PUT' });
+    } catch (e) {}
+  }
+}
+
+async function playSpotifyPlaylist(uri) {
+  if (!state.spotify.accessToken) return;
+  if (!state.spotify.deviceId) {
+    // Try to get one
+    const devices = await fetchSpotifyDevices();
+    if (devices.length === 0) {
+      showToast('Lance Spotify sur un appareil d\'abord');
+      return;
+    }
+    state.spotify.deviceId = devices[0].id;
+  }
+  try {
+    await spotifyApi(`/me/player/play?device_id=${state.spotify.deviceId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ context_uri: uri }),
+    });
+    showToast('▶ Lecture lancée');
+    setTimeout(pollSpotifyState, 500);
+  } catch (e) {
+    showToast('Erreur - device actif requis');
+  }
+}
+
+async function loadAndShowPlaylists() {
+  await fetchSpotifyPlaylists();
+  const container = document.getElementById('spotifyPlaylistsContainer');
+  if (!container) return;
+  if (spotifyPlaylists.length === 0) {
+    container.innerHTML = '<div style="font-size:11px; opacity:.7; text-align:center; padding:10px;">Aucune playlist</div>';
+    return;
+  }
+  container.innerHTML = spotifyPlaylists.map(p => `
+    <div class="spotify-playlist-item" onclick="playSpotifyPlaylist('${p.uri}')">
+      <div class="spotify-playlist-img" ${p.images && p.images[0] ? `style="background-image:url('${p.images[0].url}')"` : ''}></div>
+      <div class="spotify-playlist-name">${escapeHtml(p.name)}</div>
+    </div>
+  `).join('');
+}
+
+async function showDevicePicker() {
+  const devices = await fetchSpotifyDevices();
+  const container = document.getElementById('spotifyDevicesContainer');
+  if (!container) return;
+  if (devices.length === 0) {
+    container.innerHTML = '<div style="font-size:11px; opacity:.7; text-align:center; padding:10px;">Aucun appareil. Lance Spotify sur ton phone/desktop/enceinte.</div>';
+    return;
+  }
+  container.innerHTML = devices.map(d => `
+    <div class="spotify-device-item ${d.is_active?'active':''}" onclick="transferToDevice('${d.id}')">
+      <span style="font-size:14px;">${deviceIcon(d.type)}</span>
+      <div style="flex:1; overflow:hidden;">
+        <div style="font-size:12px; font-weight:600;">${escapeHtml(d.name)}</div>
+        <div style="font-size:10px; opacity:.7;">${d.type}${d.is_active?' · actif':''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deviceIcon(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('computer')) return '💻';
+  if (t.includes('smartphone') || t.includes('phone')) return '📱';
+  if (t.includes('speaker')) return '🔊';
+  if (t.includes('tv')) return '📺';
+  if (t.includes('tablet')) return '📲';
+  return '🎵';
+}
+
+function renderSpotifyPanel() {
+  const panel = document.getElementById('spotifyPanel');
+  const status = document.getElementById('spotifyStatus');
+  if (!panel) return;
+
+  // Not configured
+  if (!state.spotify.clientId) {
+    if (status) status.textContent = 'non configuré';
+    panel.innerHTML = `
+      <div class="spotify-player disconnected" style="text-align:center;">
+        <div style="font-size:13px; margin-bottom:10px;">♫ Spotify</div>
+        <p style="font-size:11px; opacity:.7; margin-bottom:10px; line-height:1.5;">
+          Connecte ton compte Spotify pour piloter la musique depuis ce dashboard.
+        </p>
+        <button class="gold" onclick="openSpotifySetup()">Configurer</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Not connected
+  if (!state.spotify.accessToken) {
+    if (status) status.textContent = 'déconnecté';
+    panel.innerHTML = `
+      <div class="spotify-player disconnected" style="text-align:center;">
+        <div style="font-size:13px; margin-bottom:10px;">♫ Spotify configuré</div>
+        <button class="gold" onclick="spotifyLogin()" style="background:#1db954; border-color:#1db954; color:#fff;">Se connecter</button>
+      </div>
+    `;
+    return;
+  }
+
+  // Connected, but no active device
+  const ps = spotifyCurrentState;
+  if (!ps || !ps.device) {
+    if (status) status.textContent = 'aucun device';
+    panel.innerHTML = `
+      <div class="spotify-player disconnected" style="text-align:center;">
+        <div style="font-size:13px; color:#1db954; margin-bottom:8px;">♫ Connecté à Spotify</div>
+        <p style="font-size:11px; opacity:.8; margin-bottom:10px; line-height:1.5;">
+          Lance Spotify sur ton téléphone, desktop ou enceinte pour commencer.
+        </p>
+        <button class="tiny" onclick="showDevicePicker()">↻ Chercher appareils</button>
+        <div id="spotifyDevicesContainer" style="margin-top:10px;"></div>
+      </div>
+    `;
+    return;
+  }
+
+  // Active playback
+  const track = ps.item;
+  const isPlaying = ps.is_playing;
+  const position = ps.progress_ms || 0;
+  const duration = track ? track.duration_ms : 0;
+  const progress = duration > 0 ? (position / duration * 100) : 0;
+  if (status) status.textContent = isPlaying ? '▶ playing' : '⏸ paused';
+
+  const artUrl = track && track.album && track.album.images && track.album.images[0] ? track.album.images[0].url : '';
+  const trackName = track ? track.name : 'Aucune piste';
+  const artistName = track ? (track.artists || []).map(a => a.name).join(', ') : '—';
+  const deviceName = ps.device ? ps.device.name : '';
+  const deviceVol = ps.device ? (ps.device.volume_percent / 100) : (state.spotify.lastVolume || 0.5);
+
+  panel.innerHTML = `
+    <div class="spotify-player">
+      <div class="spotify-track">
+        <div class="spotify-art" ${artUrl ? `style="background-image:url('${artUrl}')"` : ''}></div>
+        <div class="spotify-info">
+          <div class="spotify-title">${escapeHtml(trackName)}</div>
+          <div class="spotify-artist">${escapeHtml(artistName)}</div>
+        </div>
+      </div>
+      <div class="spotify-progress">
+        <div class="spotify-progress-bar" style="width:${progress}%"></div>
+      </div>
+      <div class="spotify-controls" style="margin-top:10px;">
+        <button onclick="spotifyPrev()" title="Précédent">⏮</button>
+        <button class="play-pause" onclick="spotifyTogglePlay()" title="Play/Pause">${isPlaying ? '⏸' : '▶'}</button>
+        <button onclick="spotifyNext()" title="Suivant">⏭</button>
+      </div>
+      <div class="spotify-volume">
+        <span>🔈</span>
+        <input type="range" min="0" max="100" value="${Math.round(deviceVol * 100)}" oninput="spotifySetVolume(this.value/100)">
+        <span>🔊</span>
+      </div>
+      <div style="font-size:10px; opacity:.7; text-align:center; margin-top:6px;">
+        ${deviceIcon(ps.device.type)} ${escapeHtml(deviceName)}
+        <a onclick="showDevicePicker()" style="cursor:pointer; color:#1db954; margin-left:6px;">changer</a>
+      </div>
+      <div id="spotifyDevicesContainer"></div>
+      ${state.spotify.ducking ? `<div class="spotify-ducking-info">DUCKING ACTIF · Volume baissé pendant alertes</div>` : ''}
+      <div style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; opacity:.8;">Playlists</span>
+        <button class="tiny" onclick="loadAndShowPlaylists()" style="background:rgba(0,0,0,.3); color:#fff; border-color:rgba(255,255,255,.2);">↻ Charger</button>
+      </div>
+      <div class="spotify-playlists" id="spotifyPlaylistsContainer"></div>
+    </div>
+  `;
+}
+
+// ============== PLAYERS ==============
+function addPlayer() {
+  const input = document.getElementById('newPlayerName');
+  const name = input.value.trim();
+  if (!name) return;
+  state.players.push({
+    id: state.nextPlayerId++,
+    name,
+    buyins: 1,
+    rebuys: 0,
+    eliminated: false,
+    eliminatedAt: null,
+    killedBy: null,
+    bountiesWon: 0,
+    tableId: null,
+    seat: null,
+  });
+  input.value = '';
+  render(); save();
+}
+
+function rebuyPlayer(id) {
+  if (!isRebuyOpen()) {
+    showToast('Rebuy fermé');
+    return;
+  }
+  const p = state.players.find(p => p.id === id);
+  if (p) {
+    p.rebuys++;
+    if (p.eliminated) {
+      p.eliminated = false;
+      p.eliminatedAt = null;
+      p.killedBy = null;
+      // Seat was kept on elimination - player resumes at the same spot.
+      // Only reseat if for some reason they have no seat (e.g. rebuy after rebuy closed earlier then reopened, edge case)
+      if (p.tableId === null) reseatPlayer(p);
+    }
+    render(); save();
+  }
+}
+
+function eliminateClick(id) {
+  const victim = state.players.find(p => p.id === id);
+  if (!victim) return;
+  document.getElementById('elimVictim').textContent = victim.name;
+  const select = document.getElementById('elimKiller');
+  const candidates = state.players.filter(p => p.id !== id && !p.eliminated);
+  select.innerHTML = '<option value="">— Aucun / inconnu —</option>' +
+    candidates.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  select.dataset.victimId = id;
+  openModal('eliminateModal');
+}
+
+function confirmEliminate() {
+  const select = document.getElementById('elimKiller');
+  const victimId = parseInt(select.dataset.victimId);
+  const killerId = select.value ? parseInt(select.value) : null;
+  const victim = state.players.find(p => p.id === victimId);
+  if (!victim) return;
+  victim.eliminated = true;
+  victim.eliminatedAt = Date.now();
+  victim.killedBy = killerId;
+  // Seat is kept while rebuy is open (player may come back to same spot).
+  // It will be freed automatically when rebuy closes (see freeSeatsOfOutPlayers).
+  if (killerId) {
+    const killer = state.players.find(p => p.id === killerId);
+    if (killer) killer.bountiesWon++;
+  }
+  closeModal('eliminateModal');
+  showToast(`${victim.name} éliminé`);
+  // Auto-check balance hint (only triggers visually when seats actually free up)
+  setTimeout(checkBalance, 50);
+  render(); save();
+}
+
+// Free seats of eliminated players who can no longer rebuy.
+// Called whenever the rebuy window may have just closed (level change).
+function freeSeatsOfOutPlayers() {
+  if (isRebuyOpen()) return; // still in rebuy window, keep seats
+  state.players.forEach(p => {
+    if (p.eliminated && p.tableId !== null) {
+      p.tableId = null;
+      p.seat = null;
+    }
+  });
+}
+
+function removePlayer(id) {
+  if (!confirm('Supprimer ce joueur ?')) return;
+  state.players = state.players.filter(p => p.id !== id);
+  render(); save();
+}
+
+function isRebuyOpen() {
+  return currentLevelNumber() <= state.settings.rebuyEndLevel;
+}
+
+// ============== TABLES ==============
+function activeTableIds() {
+  // Tables 1..numTables minus broken ones
+  const all = [];
+  for (let i = 1; i <= state.settings.numTables; i++) {
+    if (!state.tablesBroken.includes(i)) all.push(i);
+  }
+  return all;
+}
+
+function playersAtTable(tableId) {
+  // Active players currently seated at this table (excludes eliminated, even if their seat is reserved)
+  return state.players.filter(p => !p.eliminated && p.tableId === tableId);
+}
+
+function reservedSeatsAtTable(tableId) {
+  // Eliminated players whose seat is still held (rebuy window open)
+  return state.players.filter(p => p.eliminated && p.tableId === tableId && isRebuyOpen());
+}
+
+function unseatedActive() {
+  return state.players.filter(p => !p.eliminated && p.tableId === null);
+}
+
+function freeSeatsAtTable(tableId) {
+  // A seat is free only if no active player AND no reserved (eliminated, rebuy open) player is on it
+  const occupiedBy = new Set();
+  state.players.forEach(p => {
+    if (p.tableId === tableId && p.seat !== null) {
+      // Skip seats of eliminated players when rebuy is closed (they're free)
+      if (p.eliminated && !isRebuyOpen()) return;
+      occupiedBy.add(p.seat);
+    }
+  });
+  const free = [];
+  for (let s = 1; s <= state.settings.seatsPerTable; s++) {
+    if (!occupiedBy.has(s)) free.push(s);
+  }
+  return free;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function seatRandom() {
+  const active = state.players.filter(p => !p.eliminated);
+  if (active.length === 0) {
+    showToast('Ajoute des joueurs d\'abord');
+    return;
+  }
+  if (!confirm(`Tirage au sort pour ${active.length} joueurs sur ${activeTableIds().length} table(s) ?`)) return;
+
+  // Reset all seating (active only)
+  active.forEach(p => { p.tableId = null; p.seat = null; });
+  // Reopen all tables for a fresh draw
+  state.tablesBroken = [];
+
+  const tables = activeTableIds();
+  const shuffled = shuffle(active);
+
+  // Round-robin balanced distribution
+  shuffled.forEach((p, i) => {
+    p.tableId = tables[i % tables.length];
+  });
+
+  // Assign random seats within each table
+  tables.forEach(tid => {
+    const players = playersAtTable(tid);
+    const seatNumbers = shuffle(
+      Array.from({ length: state.settings.seatsPerTable }, (_, i) => i + 1)
+    );
+    players.forEach((p, i) => p.seat = seatNumbers[i]);
+  });
+
+  showToast('🎲 Tirage effectué');
+  render(); save();
+}
+
+function reseatPlayer(p) {
+  // Find a table with a free seat (lightest first)
+  const tables = activeTableIds()
+    .map(id => ({ id, count: playersAtTable(id).length }))
+    .sort((a, b) => a.count - b.count);
+  for (const t of tables) {
+    const free = freeSeatsAtTable(t.id);
+    if (free.length > 0) {
+      p.tableId = t.id;
+      p.seat = free[Math.floor(Math.random() * free.length)];
+      return true;
+    }
+  }
+  return false;
+}
+
+function checkBalance() {
+  // Returns a hint string or null
+  const tables = activeTableIds();
+  if (tables.length === 0) return null;
+
+  const counts = tables.map(id => ({ id, count: playersAtTable(id).length }));
+  const active = state.players.filter(p => !p.eliminated).length;
+
+  // Consolidation possible? Only when rebuy is closed (else seats are still reserved)
+  if (tables.length > 1 && !isRebuyOpen() && active <= state.settings.breakThreshold && active <= state.settings.seatsPerTable) {
+    return {
+      type: 'consolidate',
+      msg: `⚖ Consolidation : ${active} joueurs ≤ seuil (${state.settings.breakThreshold}). Casse une table pour réunir tout le monde.`,
+    };
+  }
+
+  // Imbalance: max - min >= 2 (standard poker tournament rule)
+  const max = Math.max(...counts.map(c => c.count));
+  const min = Math.min(...counts.map(c => c.count));
+  if (max - min >= 2) {
+    const bigTable = counts.find(c => c.count === max);
+    const smallTable = counts.find(c => c.count === min);
+    return {
+      type: 'imbalance',
+      msg: `⚖ Déséquilibre : Table ${bigTable.id} (${max}) vs Table ${smallTable.id} (${min}). Déplace un joueur de T${bigTable.id} → T${smallTable.id}.`,
+      from: bigTable.id,
+      to: smallTable.id,
+    };
+  }
+
+  return null;
+}
+
+function suggestBalance() {
+  const hint = checkBalance();
+  if (!hint) {
+    showToast('✓ Tables équilibrées');
+    renderBalanceHint();
+    return;
+  }
+  if (hint.type === 'consolidate') {
+    if (confirm(hint.msg + '\n\nCasser automatiquement et réunir tous les joueurs sur une seule table ?')) {
+      consolidateAll();
+    }
+  } else if (hint.type === 'imbalance') {
+    if (confirm(hint.msg + '\n\nDéplacer automatiquement un joueur au hasard ?')) {
+      autoMoveOne(hint.from, hint.to);
+    }
+  }
+}
+
+function autoMoveOne(fromId, toId) {
+  const candidates = playersAtTable(fromId);
+  if (candidates.length === 0) return;
+  // Pick random player (in real tournaments: the "big blind" or last to be BB, but random is fine for home games)
+  const victim = candidates[Math.floor(Math.random() * candidates.length)];
+  const freeSeats = freeSeatsAtTable(toId);
+  if (freeSeats.length === 0) {
+    showToast('Pas de siège libre à la table cible');
+    return;
+  }
+  victim.tableId = toId;
+  victim.seat = freeSeats[Math.floor(Math.random() * freeSeats.length)];
+  showToast(`${victim.name} → Table ${toId}`);
+  render(); save();
+}
+
+function consolidateAll() {
+  // Pick the table with most players as "survivor", merge everyone there
+  const tables = activeTableIds();
+  const counts = tables.map(id => ({ id, count: playersAtTable(id).length }));
+  counts.sort((a, b) => b.count - a.count);
+  const survivor = counts[0].id;
+
+  const allActive = state.players.filter(p => !p.eliminated);
+  if (allActive.length > state.settings.seatsPerTable) {
+    showToast('Trop de joueurs pour une seule table');
+    return;
+  }
+
+  // Mark other tables as broken
+  tables.forEach(id => {
+    if (id !== survivor) {
+      if (!state.tablesBroken.includes(id)) state.tablesBroken.push(id);
+    }
+  });
+
+  // Move all active players to survivor, with random seats
+  const seatNums = shuffle(
+    Array.from({ length: state.settings.seatsPerTable }, (_, i) => i + 1)
+  );
+  allActive.forEach((p, i) => {
+    p.tableId = survivor;
+    p.seat = seatNums[i];
+  });
+
+  showToast(`🏁 Tables fusionnées sur la Table ${survivor}`);
+  render(); save();
+}
+
+function breakTable(tableId) {
+  if (!confirm(`Casser la Table ${tableId} ? Les joueurs seront redistribués sur les autres tables.`)) return;
+  const playersToMove = playersAtTable(tableId);
+  const otherTables = activeTableIds().filter(id => id !== tableId);
+  if (otherTables.length === 0) {
+    showToast('Aucune autre table disponible');
+    return;
+  }
+  // Check capacity
+  const totalFree = otherTables.reduce((s, id) => s + freeSeatsAtTable(id).length, 0);
+  if (totalFree < playersToMove.length) {
+    showToast('Pas assez de sièges libres sur les autres tables');
+    return;
+  }
+  // Distribute round-robin to balance
+  const shuffledPlayers = shuffle(playersToMove);
+  shuffledPlayers.forEach(p => {
+    // Pick the table with the fewest players currently
+    const targets = otherTables
+      .map(id => ({ id, count: playersAtTable(id).length, free: freeSeatsAtTable(id) }))
+      .filter(t => t.free.length > 0)
+      .sort((a, b) => a.count - b.count);
+    if (targets.length === 0) return;
+    const target = targets[0];
+    p.tableId = target.id;
+    p.seat = target.free[Math.floor(Math.random() * target.free.length)];
+  });
+  if (!state.tablesBroken.includes(tableId)) state.tablesBroken.push(tableId);
+  showToast(`Table ${tableId} cassée`);
+  render(); save();
+}
+
+function reopenTable(tableId) {
+  state.tablesBroken = state.tablesBroken.filter(id => id !== tableId);
+  render(); save();
+}
+
+function movePlayerClick(playerId) {
+  const p = state.players.find(p => p.id === playerId);
+  if (!p) return;
+  document.getElementById('moveName').textContent = p.name;
+  const select = document.getElementById('moveTarget');
+  const options = [];
+  options.push(`<option value="none">— Aucune table (en attente) —</option>`);
+  activeTableIds().forEach(tid => {
+    const occ = playersAtTable(tid).length;
+    const free = freeSeatsAtTable(tid);
+    if (tid === p.tableId) {
+      options.push(`<option value="${tid}" disabled>Table ${tid} (table actuelle)</option>`);
+    } else if (free.length === 0) {
+      options.push(`<option value="${tid}" disabled>Table ${tid} — pleine (${occ}/${state.settings.seatsPerTable})</option>`);
+    } else {
+      options.push(`<option value="${tid}">Table ${tid} (${occ}/${state.settings.seatsPerTable})</option>`);
+    }
+  });
+  select.innerHTML = options.join('');
+  select.dataset.playerId = playerId;
+  openModal('moveModal');
+}
+
+function confirmMove() {
+  const select = document.getElementById('moveTarget');
+  const playerId = parseInt(select.dataset.playerId);
+  const target = select.value;
+  const p = state.players.find(p => p.id === playerId);
+  if (!p) return;
+  if (target === 'none') {
+    p.tableId = null;
+    p.seat = null;
+  } else {
+    const tid = parseInt(target);
+    const free = freeSeatsAtTable(tid);
+    if (free.length === 0) { showToast('Plus de siège libre'); return; }
+    p.tableId = tid;
+    p.seat = free[Math.floor(Math.random() * free.length)];
+  }
+  closeModal('moveModal');
+  showToast(`${p.name} déplacé`);
+  render(); save();
+}
+
+function openTablesConfig() {
+  document.getElementById('setNumTables').value = state.settings.numTables;
+  document.getElementById('setSeatsPerTable').value = state.settings.seatsPerTable;
+  document.getElementById('setBreakThreshold').value = state.settings.breakThreshold;
+  openModal('tablesConfigModal');
+}
+
+function saveTablesConfig() {
+  const newNum = Math.max(1, parseInt(document.getElementById('setNumTables').value) || 1);
+  const newSeats = Math.max(2, Math.min(9, parseInt(document.getElementById('setSeatsPerTable').value) || 9));
+  state.settings.numTables = newNum;
+  state.settings.seatsPerTable = newSeats;
+  state.settings.breakThreshold = Math.max(2, Math.min(newSeats, parseInt(document.getElementById('setBreakThreshold').value) || 8));
+  // Clean up: if a player is seated on a now-removed table, unseat them
+  state.players.forEach(p => {
+    if (p.tableId !== null && p.tableId > newNum) {
+      p.tableId = null; p.seat = null;
+    }
+    if (p.seat !== null && p.seat > newSeats) {
+      // Re-pick a free seat or unseat
+      if (p.tableId !== null) {
+        const free = freeSeatsAtTable(p.tableId);
+        p.seat = free[0] || null;
+        if (!p.seat) p.tableId = null;
+      }
+    }
+  });
+  closeModal('tablesConfigModal');
+  showToast('Config tables enregistrée');
+  render(); save();
+}
+
+// ============== COMPUTED ==============
+function activePlayers() { return state.players.filter(p => !p.eliminated); }
+function totalRebuys() { return state.players.reduce((s,p) => s + p.rebuys, 0); }
+function totalEntries() { return state.players.reduce((s,p) => s + p.buyins + p.rebuys, 0); }
+function prizePoolAmount() {
+  // Buy-in part only (bounty is separate, paid live)
+  return totalEntries() * state.settings.buyin;
+}
+function bountyPoolAmount() {
+  return totalEntries() * state.settings.bounty;
+}
+function totalChipsInPlay() {
+  return activePlayers().reduce((sum, p) => {
+    return sum + state.settings.startStack * (1 + p.rebuys);
+  }, 0)
+  // include rebuys done by now-eliminated players if they are still in play... actually only active stacks matter
+  ;
+}
+// Actually total chips = total entries × startStack (since chips persist after eliminations until consolidated)
+function chipsInPlay() {
+  return totalEntries() * state.settings.startStack;
+}
+
+// ============== RENDER ==============
+function render() {
+  renderTimer();
+  renderBlinds();
+  renderStats();
+  renderPlayers();
+  renderRebuyStatus();
+  renderPayouts();
+  renderTables();
+  renderBalanceHint();
+}
+
+function renderTables() {
+  const view = document.getElementById('tablesView');
+  const tables = activeTableIds();
+  const totalActive = state.players.filter(p => !p.eliminated).length;
+  const unseated = unseatedActive();
+
+  document.getElementById('tablesCount').textContent =
+    `${tables.length} table${tables.length>1?'s':''} · ${totalActive} joueurs`;
+
+  let html = '';
+
+  // Unseated waiting bench
+  if (unseated.length > 0) {
+    html += `
+      <div class="poker-table" style="border-color:var(--gold); border-style:dashed;">
+        <div class="poker-table-header">
+          <div class="poker-table-title" style="color:var(--gold-bright);">⏳ En attente</div>
+          <div class="seat-occupancy">${unseated.length} joueur${unseated.length>1?'s':''}</div>
+        </div>
+        <div class="seats-grid">
+          ${unseated.map(p => `
+            <div class="seat occupied" onclick="movePlayerClick(${p.id})" title="Cliquer pour placer">
+              <span class="seat-num">—</span>
+              <span class="seat-name">${escapeHtml(p.name)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  tables.forEach(tid => {
+    const seated = playersAtTable(tid);
+    const reserved = reservedSeatsAtTable(tid);
+    const seatsPerTable = state.settings.seatsPerTable;
+    // Build seat array (active first, then reserved)
+    const seatsArr = [];
+    for (let s = 1; s <= seatsPerTable; s++) {
+      const active = seated.find(p => p.seat === s);
+      const reservedFor = reserved.find(p => p.seat === s);
+      seatsArr.push({ seat: s, player: active, reservedFor });
+    }
+
+    html += `
+      <div class="poker-table">
+        <div class="poker-table-header">
+          <div class="poker-table-title">♠ Table ${tid}</div>
+          <div class="seat-occupancy">${seated.length}/${seatsPerTable}${reserved.length>0?` <span style="color:var(--gold-dim);">+${reserved.length} réservé${reserved.length>1?'s':''}</span>`:''}</div>
+        </div>
+        <div class="seats-grid">
+          ${seatsArr.map(s => {
+            if (s.player) {
+              return `<div class="seat occupied" onclick="movePlayerClick(${s.player.id})" title="Cliquer pour déplacer">
+                <span class="seat-num">S${s.seat}</span>
+                <span class="seat-name">${escapeHtml(s.player.name)}</span>
+              </div>`;
+            }
+            if (s.reservedFor) {
+              return `<div class="seat reserved" onclick="rebuyPlayer(${s.reservedFor.id})" title="Cliquer pour faire rebuy">
+                <span class="seat-num">S${s.seat}</span>
+                <span class="seat-name">${escapeHtml(s.reservedFor.name)}</span>
+              </div>`;
+            }
+            return `<div class="seat empty">
+              <span class="seat-num">S${s.seat}</span>
+              <span class="seat-name">—</span>
+            </div>`;
+          }).join('')}
+        </div>
+        ${tables.length > 1 ? `
+          <div class="table-actions">
+            <button class="tiny red" onclick="breakTable(${tid})">Casser</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  // Broken tables (closed)
+  state.tablesBroken.forEach(tid => {
+    html += `
+      <div class="poker-table broken">
+        <div class="poker-table-header">
+          <div class="poker-table-title">✕ Table ${tid} (cassée)</div>
+          <button class="tiny" onclick="reopenTable(${tid})">Rouvrir</button>
+        </div>
+      </div>
+    `;
+  });
+
+  view.innerHTML = html || '<div style="opacity:.5; text-align:center; padding:20px; font-size:12px;">Configure les tables puis fais un tirage</div>';
+}
+
+function renderBalanceHint() {
+  const el = document.getElementById('balanceHint');
+  const hint = checkBalance();
+  if (!hint) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  el.textContent = hint.msg;
+}
+
+function renderTimer() {
+  const m = Math.floor(state.timeLeft / 60);
+  const s = state.timeLeft % 60;
+  const display = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const el = document.getElementById('timerDisplay');
+  el.textContent = display;
+  el.classList.remove('warning','critical');
+  if (state.timeLeft <= 30) el.classList.add('critical');
+  else if (state.timeLeft <= 60) el.classList.add('warning');
+
+  document.getElementById('playBtn').textContent = state.running ? '⏸ PAUSE' : '▶ DÉMARRER';
+}
+
+function renderBlinds() {
+  const seg = getCurrentSegment();
+  const levelLabel = document.getElementById('levelLabel');
+  const levelNum = document.getElementById('levelNum');
+  const sbValue = document.getElementById('sbValue');
+  const bbValue = document.getElementById('bbValue');
+  const anteRow = document.getElementById('anteRow');
+  const anteValue = document.getElementById('anteValue');
+  const nextLevelText = document.getElementById('nextLevelText');
+
+  if (isBreak(seg)) {
+    levelLabel.textContent = 'PAUSE';
+    levelNum.textContent = '🍔';
+    levelNum.classList.add('break');
+    sbValue.textContent = '—';
+    bbValue.textContent = '—';
+    anteRow.style.display = 'none';
+  } else {
+    levelLabel.textContent = 'NIVEAU';
+    levelNum.textContent = currentLevelNumber();
+    levelNum.classList.remove('break');
+    sbValue.textContent = seg.sb.toLocaleString('fr-FR');
+    bbValue.textContent = seg.bb.toLocaleString('fr-FR');
+    if (seg.ante && seg.ante > 0) {
+      anteRow.style.display = 'block';
+      anteValue.textContent = seg.ante.toLocaleString('fr-FR');
+    } else {
+      anteRow.style.display = 'none';
+    }
+  }
+
+  nextLevelText.textContent = nextLevelInfo();
+}
+
+function renderStats() {
+  document.getElementById('activePlayers').textContent = activePlayers().length;
+  document.getElementById('totalPlayers').textContent = state.players.length;
+
+  const chips = chipsInPlay();
+  document.getElementById('totalChips').textContent = chips.toLocaleString('fr-FR');
+  document.getElementById('rebuysCount').textContent = `${totalRebuys()} rebuys`;
+
+  const active = activePlayers().length;
+  const avg = active > 0 ? Math.round(chips / active) : 0;
+  document.getElementById('avgStack').textContent = avg > 0 ? avg.toLocaleString('fr-FR') : '—';
+  const seg = getCurrentSegment();
+  const bb = (seg && seg.type === 'level') ? seg.bb : null;
+  document.getElementById('avgStackBb').textContent = (avg > 0 && bb) ? `${Math.round(avg/bb)} BB` : '— BB';
+
+  document.getElementById('prizePool').textContent = `${prizePoolAmount()} €`;
+  document.getElementById('bountyPool').textContent = `Bounty pool : ${bountyPoolAmount()} €`;
+}
+
+function renderPlayers() {
+  const list = document.getElementById('playerList');
+  document.getElementById('playerCount').textContent = `${activePlayers().length} actifs · ${state.players.length} total`;
+  list.innerHTML = state.players.map(p => `
+    <div class="player ${p.eliminated ? 'eliminated' : ''}">
+      <div>
+        <div class="player-name">${escapeHtml(p.name)}${p.tableId && !p.eliminated ? ` <span style="color:var(--gold); font-size:10px; font-weight:500;">· T${p.tableId}/S${p.seat}</span>` : ''}</div>
+        <div class="player-meta">
+          Stack ${(state.settings.startStack * (1 + p.rebuys)).toLocaleString('fr-FR')}
+          ${p.rebuys > 0 ? `· ${p.rebuys} rebuy${p.rebuys>1?'s':''}` : ''}
+          ${p.bountiesWon > 0 ? `· 🎯 ${p.bountiesWon}` : ''}
+        </div>
+      </div>
+      <div class="player-actions">
+        ${!p.eliminated
+          ? `<button class="tiny" onclick="rebuyPlayer(${p.id})" ${!isRebuyOpen()?'disabled style="opacity:.4"':''}>+R</button>
+             <button class="tiny red" onclick="eliminateClick(${p.id})">✕</button>`
+          : `<button class="tiny" onclick="rebuyPlayer(${p.id})" ${!isRebuyOpen()?'disabled style="opacity:.4"':''}>↺</button>`
+        }
+        <button class="tiny ghost" onclick="removePlayer(${p.id})" title="Supprimer">🗑</button>
+      </div>
+    </div>
+  `).join('') || '<div style="opacity:.5; text-align:center; padding:20px; font-size:12px;">Aucun joueur — ajoute-les ci-dessus</div>';
+}
+
+function renderRebuyStatus() {
+  const el = document.getElementById('rebuyStatus');
+  if (isRebuyOpen()) {
+    el.classList.remove('closed');
+    el.innerHTML = `🟢 REBUY OUVERT — Fin level ${state.settings.rebuyEndLevel}`;
+  } else {
+    el.classList.add('closed');
+    el.innerHTML = '🔴 REBUY FERMÉ';
+  }
+}
+
+function renderPayouts() {
+  const pool = prizePoolAmount();
+  document.getElementById('prizeTotal').textContent = `${pool} €`;
+  const places = ['🥇 1er','🥈 2e','🥉 3e','4e','5e','6e','7e','8e','9e'];
+  const html = state.settings.payouts.map((pct, i) => {
+    const amt = Math.round(pool * pct / 100);
+    return `<div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.05);">
+      <span style="color:var(--gold);">${places[i] || (i+1)+'e'}</span>
+      <span><strong>${amt} €</strong> <span style="color:var(--gold-dim); font-size:11px;">(${pct}%)</span></span>
+    </div>`;
+  }).join('');
+  document.getElementById('payoutList').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+// ============== MODALS ==============
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function openSettings() {
+  document.getElementById('setBuyin').value = state.settings.buyin;
+  document.getElementById('setBounty').value = state.settings.bounty;
+  document.getElementById('setStartStack').value = state.settings.startStack;
+  document.getElementById('setLevelDuration').value = state.settings.levelDuration;
+  document.getElementById('setRebuyEndLevel').value = state.settings.rebuyEndLevel;
+  document.getElementById('setRebuyStack').value = state.settings.rebuyStack;
+  document.getElementById('setPayouts').value = state.settings.payouts.join(',');
+  document.getElementById('setSound').value = state.settings.sound;
+  // Sync theme swatch selection
+  document.querySelectorAll('.theme-swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.theme === (state.settings.theme || 'casino'));
+  });
+  openModal('settingsModal');
+}
+
+function pickTheme(name) {
+  state.settings.theme = name;
+  document.querySelectorAll('.theme-swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.theme === name);
+  });
+  applyTheme(name);
+  save();
+}
+
+function applyTheme(name) {
+  if (!name || name === 'casino') {
+    document.body.removeAttribute('data-theme');
+  } else {
+    document.body.setAttribute('data-theme', name);
+  }
+}
+
+function saveSettings() {
+  state.settings.buyin = parseInt(document.getElementById('setBuyin').value) || 0;
+  state.settings.bounty = parseInt(document.getElementById('setBounty').value) || 0;
+  state.settings.startStack = parseInt(document.getElementById('setStartStack').value) || 20000;
+  const oldDur = state.settings.levelDuration;
+  state.settings.levelDuration = parseInt(document.getElementById('setLevelDuration').value) || 20;
+  state.settings.rebuyEndLevel = parseInt(document.getElementById('setRebuyEndLevel').value) || 6;
+  state.settings.rebuyStack = parseInt(document.getElementById('setRebuyStack').value) || state.settings.startStack;
+  state.settings.payouts = document.getElementById('setPayouts').value
+    .split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+  state.settings.sound = document.getElementById('setSound').value;
+  // Theme already applied live via pickTheme, just confirm
+  applyTheme(state.settings.theme);
+
+  // If level duration changed and we're not started, update timeLeft
+  if (oldDur !== state.settings.levelDuration && getCurrentSegment().type === 'level') {
+    if (!state.running) state.timeLeft = state.settings.levelDuration * 60;
+  }
+  closeModal('settingsModal');
+  showToast('Réglages enregistrés');
+  render(); save();
+}
+
+function openStructure() {
+  renderStructureEditor();
+  openModal('structureModal');
+}
+
+function renderStructureEditor() {
+  const t = document.getElementById('structureTable');
+  let levelN = 0;
+  t.innerHTML = `
+    <thead>
+      <tr>
+        <th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Durée</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      ${state.structure.map((s, i) => {
+        const isCurrent = i === state.currentIdx ? 'current' : '';
+        if (s.type === 'break') {
+          return `<tr class="break-row ${isCurrent}">
+            <td>—</td>
+            <td colspan="3" style="font-style:italic;">🍔 PAUSE</td>
+            <td><input class="cell" type="number" min="1" value="${s.duration}" onchange="updateSegment(${i},'duration',this.value)"></td>
+            <td class="row-actions">
+              <button class="tiny" onclick="moveSegment(${i},-1)" title="Monter">↑</button>
+              <button class="tiny" onclick="moveSegment(${i},1)" title="Descendre">↓</button>
+              <button class="tiny red" onclick="deleteSegment(${i})" title="Supprimer">✕</button>
+            </td>
+          </tr>`;
+        }
+        levelN++;
+        return `<tr class="${isCurrent}">
+          <td>${levelN}</td>
+          <td><input class="cell" type="number" min="0" value="${s.sb}" onchange="updateSegment(${i},'sb',this.value)"></td>
+          <td><input class="cell" type="number" min="0" value="${s.bb}" onchange="updateSegment(${i},'bb',this.value)"></td>
+          <td><input class="cell" type="number" min="0" value="${s.ante || 0}" onchange="updateSegment(${i},'ante',this.value)"></td>
+          <td><input class="cell" type="number" min="1" value="${s.duration || state.settings.levelDuration}" onchange="updateSegment(${i},'duration',this.value)"></td>
+          <td class="row-actions">
+            <button class="tiny" onclick="moveSegment(${i},-1)" title="Monter">↑</button>
+            <button class="tiny" onclick="moveSegment(${i},1)" title="Descendre">↓</button>
+            <button class="tiny" onclick="setCurrentLevel(${i})" title="Sauter à ce niveau">→</button>
+            <button class="tiny red" onclick="deleteSegment(${i})" title="Supprimer">✕</button>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>`;
+}
+
+function updateSegment(idx, field, value) {
+  const seg = state.structure[idx];
+  if (!seg) return;
+  const v = parseInt(value) || 0;
+  seg[field] = v;
+  // If we edited the current segment's duration and timer not running, sync timeLeft
+  if (idx === state.currentIdx && field === 'duration' && !state.running) {
+    state.timeLeft = segmentDurationSec(seg);
+  }
+  save();
+  render();
+  renderStructureEditor();
+}
+
+function addLevel() {
+  // Default: take last level's values and bump up slightly
+  const lastLevel = [...state.structure].reverse().find(s => s.type === 'level');
+  const newLevel = lastLevel
+    ? { type: 'level', sb: lastLevel.sb * 2, bb: lastLevel.bb * 2, ante: lastLevel.ante || 0, duration: lastLevel.duration || state.settings.levelDuration }
+    : { type: 'level', sb: 50, bb: 100, ante: 0, duration: state.settings.levelDuration };
+  state.structure.push(newLevel);
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function addBreak() {
+  state.structure.push({ type: 'break', duration: 10 });
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function deleteSegment(idx) {
+  if (state.structure.length <= 1) {
+    showToast('Impossible de supprimer le dernier niveau');
+    return;
+  }
+  if (!confirm('Supprimer ce niveau ?')) return;
+  state.structure.splice(idx, 1);
+  // Adjust currentIdx
+  if (state.currentIdx >= state.structure.length) {
+    state.currentIdx = state.structure.length - 1;
+  } else if (idx < state.currentIdx) {
+    state.currentIdx--;
+  } else if (idx === state.currentIdx && !state.running) {
+    state.timeLeft = segmentDurationSec(getCurrentSegment());
+  }
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function moveSegment(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= state.structure.length) return;
+  [state.structure[idx], state.structure[newIdx]] = [state.structure[newIdx], state.structure[idx]];
+  // Adjust currentIdx if affected
+  if (state.currentIdx === idx) state.currentIdx = newIdx;
+  else if (state.currentIdx === newIdx) state.currentIdx = idx;
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function setCurrentLevel(idx) {
+  if (!confirm('Sauter à ce niveau maintenant ?')) return;
+  state.currentIdx = idx;
+  state.timeLeft = segmentDurationSec(getCurrentSegment());
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function resetStructure() {
+  if (!confirm('Restaurer la structure par défaut ? (tes modifications seront perdues)')) return;
+  state.structure = structuredClone(DEFAULT_STRUCTURE);
+  state.currentIdx = 0;
+  state.timeLeft = segmentDurationSec(getCurrentSegment());
+  save();
+  renderStructureEditor();
+  render();
+}
+
+function resetTournament() {
+  if (!confirm('⚠ Réinitialiser complètement le tournoi ? (joueurs, timer, tout sera effacé)')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ============== INIT ==============
+try {
+  load();
+  // Apply saved theme
+  applyTheme(state.settings.theme);
+  // If running was true after reload, don't auto-restart timer — let user decide
+  state.running = false;
+  // Initialize timeLeft if invalid
+  if (!state.timeLeft || state.timeLeft <= 0) {
+    state.timeLeft = segmentDurationSec(getCurrentSegment());
+  }
+  render();
+} catch (e) {
+  console.error('INIT ERROR — corrupted state, resetting. Reason:', e);
+  document.body.insertAdjacentHTML('afterbegin',
+    `<div style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#b8252c;color:#fff;padding:14px 20px;border-radius:6px;z-index:9999;font-family:sans-serif;font-size:13px;max-width:600px;box-shadow:0 10px 40px rgba(0,0,0,.5);">
+      ⚠ État corrompu détecté — réinitialisation. <button onclick="localStorage.removeItem('${STORAGE_KEY}');location.reload();" style="margin-left:12px;padding:6px 12px;background:#fff;color:#b8252c;border:none;border-radius:3px;cursor:pointer;font-weight:600;">Reset et recharger</button>
+      <div style="margin-top:6px;font-size:11px;opacity:.9;font-family:monospace;">${String(e.message || e).replace(/</g,'&lt;')}</div>
+    </div>`);
+}
+
+// Spotify: handle OAuth callback if present, then start polling if connected
+(async () => {
+  if (location.search.includes('code=') || location.search.includes('error=')) {
+    await handleSpotifyCallback();
+  }
+  if (state.spotify.accessToken) {
+    // Check token expiry, refresh if needed
+    if (state.spotify.expiresAt && Date.now() >= state.spotify.expiresAt - 30000) {
+      await refreshSpotifyToken();
+    }
+    if (state.spotify.accessToken) {
+      if (!state.spotify.user) await fetchSpotifyUser();
+      startSpotifyPolling();
+      renderSpotifyPanel();
+    }
+  }
+})();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
+  if (e.key === 'ArrowRight') nextLevel();
+  if (e.key === 'ArrowLeft') prevLevel();
+});
+
+// Wake lock to prevent screen sleep
+if ('wakeLock' in navigator) {
+  document.addEventListener('click', async () => {
+    try { await navigator.wakeLock.request('screen'); } catch(e){}
+  }, { once: true });
+}
+</script>
+</body>
+</html>
